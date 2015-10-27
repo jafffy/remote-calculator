@@ -1,67 +1,65 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <string.h>
+#include <strings.h>
 
-#define PORT 8888
-
-void error_handling(const char* message);
-
-int main(int argc, char** argv)
+int main()
 {
-	int serv_sock, clnt_sock;
-	char message[BUFSIZ];
-	int str_len;
+	char str[100];
+	int listen_fd, comm_fd;
 
-	struct sockaddr_in serv_addr;
-	struct sockaddr_in clnt_addr;
-	int clnt_addr_size;
+	struct sockaddr_in servaddr;
 
-	serv_sock = socket(PF_INET, SOCK_STREAM, 0);
-	if (serv_sock == -1) {
-		error_handling("socket() error");
+	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+	bzero(&servaddr, sizeof(servaddr));
+
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = htons(INADDR_ANY);
+	servaddr.sin_port = htons(22000);
+
+	bind(listen_fd, (struct sockaddr*)&servaddr, sizeof(servaddr));
+
+	listen(listen_fd, 10);
+
+	comm_fd = accept(listen_fd, (struct sockaddr*) NULL, NULL);
+
+
+	while (1) {
+		bzero(str, 100);
+
+		read(comm_fd, str, 100);
+
+		int lhs, rhs;
+
+		if (strncmp(str, "add", 3) == 0) {
+			sscanf(str + 3, "%d %d", &lhs, &rhs);
+			sprintf(str, "%d", lhs + rhs);
+		} else if (strncmp(str, "sub", 3) == 0) {
+			sscanf(str + 3, "%d %d", &lhs, &rhs);
+			sprintf(str, "%d", lhs - rhs);
+		} else if (strncmp(str, "mul", 3) == 0) {
+			sscanf(str + 3, "%d %d", &lhs, &rhs);
+			sprintf(str, "%d", lhs * rhs);
+		} else if (strncmp(str, "div", 3) == 0) {
+			sscanf(str + 3, "%d %d", &lhs, &rhs);
+			sprintf(str, "%d", lhs / rhs);
+		} else if (strncmp(str, "hello", 5) == 0) {
+			sprintf(str, "Start");
+		} else if (strncmp(str, "quit", 4) == 0) {
+			sprintf(str, "End");
+			write(comm_fd, str, strlen(str) + 1);
+
+			break;
+		} else {
+			sprintf(str, "401 Unknown command");
+		}
+
+		write(comm_fd, str, strlen(str) + 1);
 	}
-
-	memset(&serv_addr, 0, sizeof(serv_addr));
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(PORT);
-
-	if (bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
-		error_handling("bind() error");
-	}
-
-	if (listen(serv_sock, 5) == -1) {
-		error_handling("listen() error");
-	}
-
-	clnt_addr_size = sizeof(clnt_addr);
-	clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
-	printf("accpted\n");
-
-	if (clnt_sock == -1) {
-		error_handling("accept() error");
-	}
-
-	while ( (str_len = read(clnt_sock, message, BUFSIZ)) != 0 ) {
-		printf("read\n");
-		write(clnt_sock, message, str_len);
-		write(1, message, str_len);
-		printf("wrote\n");
-	}
-
-	close(clnt_sock);
 
 	return 0;
-}
-
-void error_handling(const char* message)
-{
-	fputs(message, stderr);
-	fputc('\n', stderr);
-
-	exit(1);
 }
